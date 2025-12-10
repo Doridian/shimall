@@ -48,11 +48,6 @@ BOOLEAN secure_mode (void)
 	return FALSE;
 }
 
-static int
-should_use_fallback(EFI_HANDLE image_handle)
-{
-	return FALSE;
-}
 /*
  * Open the second stage bootloader and read it into a buffer
  */
@@ -354,28 +349,8 @@ done:
 EFI_STATUS init_grub(EFI_HANDLE image_handle)
 {
 	EFI_STATUS efi_status;
-	int use_fb = should_use_fallback(image_handle);
 
-	efi_status = start_image(image_handle, use_fb ? FALLBACK :second_stage);
-
-	/*
-	 * If the filename is invalid, or the file does not exist, just fall
-	 * back to the default loader.  Also fall back to the default loader
-	 * if we get a TFTP error or HTTP error.
-	 */
-	if (!use_fb && (efi_status == EFI_INVALID_PARAMETER ||
-	                efi_status == EFI_NOT_FOUND ||
-	                efi_status == EFI_HTTP_ERROR ||
-	                efi_status == EFI_TFTP_ERROR)) {
-		console_print(
-			L"start_image() returned %r, falling back to default loader\n",
-			efi_status);
-		usleep(2000000);
-		load_options = NULL;
-		load_options_size = 0;
-		efi_status = start_image(image_handle, DEFAULT_LOADER);
-	}
-
+	efi_status = start_image(image_handle, second_stage);
 	if (EFI_ERROR(efi_status)) {
 		console_print(L"start_image() returned %r\n", efi_status);
 		usleep(2000000);

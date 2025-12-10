@@ -50,24 +50,6 @@ static BOOLEAN is_apple_firmware_vendor(void)
 	return FALSE;
 }
 
-/*
- * Check if a variable exists
- */
-static BOOLEAN check_var(CHAR16 *varname)
-{
-	EFI_STATUS efi_status;
-	UINTN size = sizeof(UINT32);
-	UINT32 MokVar;
-	UINT32 attributes;
-
-	efi_status = RT->GetVariable(varname, &SHIM_LOCK_GUID, &attributes,
-				     &size, (void *)&MokVar);
-	if (!EFI_ERROR(efi_status) || efi_status == EFI_BUFFER_TOO_SMALL)
-		return TRUE;
-
-	return FALSE;
-}
-
 #define SetVariable(name, guid, attrs, varsz, var)                                  \
 	({                                                                          \
 		EFI_STATUS efi_status_;                                             \
@@ -235,6 +217,7 @@ format_variable_info(UINT8 *buf, size_t bufsz,
  */
 static EFI_STATUS check_mok_request(EFI_HANDLE image_handle)
 {
+	(void)image_handle;
 	return EFI_SUCCESS;
 }
 

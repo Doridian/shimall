@@ -45,95 +45,13 @@ typedef struct {
  */
 BOOLEAN secure_mode (void)
 {
-	static int first = 1;
-	if (user_insecure_mode)
-		return FALSE;
-
-	if (variable_is_secureboot() != 1) {
-		if (verbose && !in_protocol && first) {
-			CHAR16 *title = L"Secure boot not enabled";
-			CHAR16 *message = L"Press any key to continue";
-			console_countdown(title, message, 5);
-		}
-		first = 0;
-		return FALSE;
-	}
-
-	/* If we /do/ have "SecureBoot", but /don't/ have "SetupMode",
-	 * then the implementation is bad, but we assume that secure boot is
-	 * enabled according to the status of "SecureBoot".  If we have both
-	 * of them, then "SetupMode" may tell us additional data, and we need
-	 * to consider it.
-	 */
-	if (variable_is_setupmode(0) == 1) {
-		if (verbose && !in_protocol && first) {
-			CHAR16 *title = L"Platform is in setup mode";
-			CHAR16 *message = L"Press any key to continue";
-			console_countdown(title, message, 5);
-		}
-		first = 0;
-		return FALSE;
-	}
-
-	first = 0;
-	return TRUE;
+	return FALSE;
 }
 
 static int
 should_use_fallback(EFI_HANDLE image_handle)
 {
-	EFI_LOADED_IMAGE *li;
-	EFI_FILE_IO_INTERFACE *fio = NULL;
-	EFI_FILE *vh = NULL;
-	EFI_FILE *fh = NULL;
-	EFI_STATUS efi_status;
-	int ret = 0;
-
-	efi_status = BS->HandleProtocol(image_handle, &EFI_LOADED_IMAGE_GUID,
-	                                (void **)&li);
-	if (EFI_ERROR(efi_status)) {
-		perror(L"Could not get image for boot" EFI_ARCH L".efi: %r\n",
-		       efi_status);
-		return 0;
-	}
-
-	if (!is_removable_media_path(li))
-		goto error;
-
-	efi_status = BS->HandleProtocol(li->DeviceHandle, &FileSystemProtocol,
-					(void **) &fio);
-	if (EFI_ERROR(efi_status)) {
-		perror(L"Could not get fio for li->DeviceHandle: %r\n",
-		       efi_status);
-		goto error;
-	}
-
-	efi_status = fio->OpenVolume(fio, &vh);
-	if (EFI_ERROR(efi_status)) {
-		perror(L"Could not open fio volume: %r\n", efi_status);
-		goto error;
-	}
-
-	efi_status = vh->Open(vh, &fh, L"\\EFI\\BOOT" FALLBACK,
-			      EFI_FILE_MODE_READ, 0);
-	if (EFI_ERROR(efi_status)) {
-		/* Do not print the error here - this is an acceptable case
-		 * for removable media, where we genuinely don't want
-		 * fallback.efi to exist.
-		 * Print(L"Could not open \"\\EFI\\BOOT%s\": %r\n", FALLBACK,
-		 *       efi_status);
-		 */
-		goto error;
-	}
-
-	ret = 1;
-error:
-	if (fh)
-		fh->Close(fh);
-	if (vh)
-		vh->Close(vh);
-
-	return ret;
+	return FALSE;
 }
 /*
  * Open the second stage bootloader and read it into a buffer
@@ -439,18 +357,6 @@ EFI_STATUS init_grub(EFI_HANDLE image_handle)
 	int use_fb = should_use_fallback(image_handle);
 
 	efi_status = start_image(image_handle, use_fb ? FALLBACK :second_stage);
-	if (efi_status == EFI_SECURITY_VIOLATION ||
-	    efi_status == EFI_ACCESS_DENIED) {
-		efi_status = start_image(image_handle, MOK_MANAGER);
-		if (EFI_ERROR(efi_status)) {
-			console_print(L"start_image() returned %r\n", efi_status);
-			usleep(2000000);
-			return efi_status;
-		}
-
-		efi_status = start_image(image_handle,
-					 use_fb ? FALLBACK : second_stage);
-	}
 
 	/*
 	 * If the filename is invalid, or the file does not exist, just fall
